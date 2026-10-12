@@ -1,14 +1,13 @@
-import { useGeoPhotos } from '@/context/GeoPhotosContext';
 import { useGeoLocation } from '@/hooks/useGeoLocation';
-import type { GeoPhoto } from '@/types/geo';
+import { usePhotos, type Photo } from '@/hooks/usePhotos';
 import { useIsFocused } from 'expo-router/react-navigation';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { FlatList, Image, StyleSheet, Text, View } from 'react-native';
 import MapView, { Marker, type Region } from 'react-native-maps';
 
 const FALLBACK: Region = { latitude: 11.5444, longitude: -72.9072, latitudeDelta: 0.5, longitudeDelta: 0.5 };
 
-function SourceBadge({ source }: { source: GeoPhoto['source'] }) {
+function SourceBadge({ source }: { source: Photo['source'] }) {
   const isCamera = source === 'camera';
   return (
     <Text style={[styles.badge, { backgroundColor: isCamera ? '#10b981' : '#6366f1' }]}>
@@ -20,17 +19,29 @@ function SourceBadge({ source }: { source: GeoPhoto['source'] }) {
 export default function MapaScreen() {
   const isFocused = useIsFocused();
   const geo = useGeoLocation({ watch: false, active: isFocused });
-  const { photos } = useGeoPhotos();
-  const [selected, setSelected] = useState<GeoPhoto | null>(null);
+  const { photos, photosWithLocation } = usePhotos();
+  const [selectedId, setSelectedId] = useState<number | null>(null);
 
-  const located = useMemo(() => photos.filter((p) => p.coords !== null), [photos]);
-  const unlocated = useMemo(() => photos.filter((p) => p.coords === null), [photos]);
+  // Lectura única de la ubicación actual al entrar a la pestaña (con permiso)
+  const { permission, getCurrent } = geo;
+  useEffect(() => {
+    if (isFocused && permission === 'granted') void getCurrent();
+  }, [isFocused, permission, getCurrent]);
+
+  const unlocated = useMemo(() => photos.filter((p) => p.latitude === null), [photos]);
+  const selected = photosWithLocation.find((p) => p.id === selectedId) ?? null;
 
   // Centro: ubicación actual; sin permiso, la última foto con coordenadas
-  const lastLocated = located[0]?.coords ?? null;
-  const center = geo.permission === 'granted' && geo.coords ? geo.coords : lastLocated;
+  const last = photosWithLocation[0];
+  const center =
+    permission === 'granted' && geo.coords
+      ? { latitude: geo.coords.latitude, longitude: geo.coords.longitude }
+      : last && last.latitude !== null && last.longitude !== null
+        ? { latitude: last.latitude, longitude: last.longitude }
+        : null;
+
   const region: Region = center
-    ? { latitude: center.latitude, longitude: center.longitude, latitudeDelta: 0.02, longitudeDelta: 0.02 }
+    ? { ...center, latitudeDelta: 0.02, longitudeDelta: 0.02 }
     : FALLBACK;
 
   return (
@@ -39,16 +50,16 @@ export default function MapaScreen() {
         key={`${region.latitude.toFixed(3)}-${region.longitude.toFixed(3)}`}
         style={styles.map}
         initialRegion={region}
-        showsUserLocation={geo.permission === 'granted'}
-        onPress={() => setSelected(null)}
+        showsUserLocation={permission === 'granted'}
+        onPress={() => setSelectedId(null)}
       >
-        {located.map((p) =>
-          p.coords ? (
+        {photosWithLocation.map((p) =>
+          p.latitude !== null && p.longitude !== null ? (
             <Marker
               key={p.id}
-              coordinate={{ latitude: p.coords.latitude, longitude: p.coords.longitude }}
+              coordinate={{ latitude: p.latitude, longitude: p.longitude }}
               pinColor={p.source === 'camera' ? 'green' : 'indigo'}
-              onPress={() => setSelected(p)}
+              onPress={() => setSelectedId(p.id)}
             />
           ) : null
         )}
@@ -60,7 +71,7 @@ export default function MapaScreen() {
           <View style={{ flex: 1, gap: 4 }}>
             <SourceBadge source={selected.source} />
             <Text style={styles.previewText}>
-              {selected.coords?.latitude.toFixed(5)}, {selected.coords?.longitude.toFixed(5)}
+              {selected.latitude?.toFixed(5)}, {selected.longitude?.toFixed(5)}
             </Text>
           </View>
         </View>
@@ -74,7 +85,7 @@ export default function MapaScreen() {
           <FlatList
             data={unlocated}
             horizontal
-            keyExtractor={(p) => p.id}
+            keyExtractor={(p) => String(p.id)}
             contentContainerStyle={{ gap: 8 }}
             renderItem={({ item }) => (
               <View>

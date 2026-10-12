@@ -1,27 +1,27 @@
 import { PermissionPrimer } from '@/components/PermissionPrimer';
-import { useGeoPhotos } from '@/context/GeoPhotosContext';
 import { useCamera } from '@/hooks/useCamera';
 import { useGeoLocation } from '@/hooks/useGeoLocation';
+import { usePhotos } from '@/hooks/usePhotos';
 import { useShake } from '@/hooks/useShake';
-import type { GeoPhoto } from '@/types/geo';
 import { CameraView } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
 import { useIsFocused } from 'expo-router/react-navigation';
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import { Alert, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 
 export default function GeoCamScreen() {
   const isFocused = useIsFocused();
   const cam = useCamera();
   const geo = useGeoLocation({ watch: true, active: isFocused });
-  const { photos, addPhoto, clearAll } = useGeoPhotos();
+  const { photos, addPhoto, clearAll } = usePhotos();
+  const [saveError, setSaveError] = useState<string | null>(null);
   const lastPhoto = photos[0] ?? null;
 
   const confirmClear = useCallback(() => {
     if (photos.length === 0) return;
     Alert.alert('¿Borrar todas las fotos?', 'Detectamos que agitaste el teléfono.', [
       { text: 'Cancelar', style: 'cancel' },
-      { text: 'Borrar todo', style: 'destructive', onPress: clearAll },
+      { text: 'Borrar todo', style: 'destructive', onPress: () => void clearAll() },
     ]);
   }, [photos.length, clearAll]);
 
@@ -31,18 +31,20 @@ export default function GeoCamScreen() {
   const resolveCoords = async () =>
     geo.permission === 'granted' ? (geo.coords ?? (await geo.getCurrent())) : null;
 
-  const buildPhoto = (uri: string, source: GeoPhoto['source'], coords: GeoPhoto['coords']): GeoPhoto => ({
-    id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-    uri,
-    coords,
-    source,
-    createdAt: Date.now(),
-  });
+  const save = async (uri: string, source: 'camera' | 'gallery') => {
+    try {
+      const coords = await resolveCoords();
+      await addPhoto({ uri, coords, source });
+      setSaveError(null);
+    } catch (e) {
+      setSaveError(e instanceof Error ? e.message : 'No se pudo guardar la foto');
+    }
+  };
 
   const handleCapture = async () => {
     const photo = await cam.takePhoto();
     if (!photo) return;
-    addPhoto(buildPhoto(photo.uri, 'camera', await resolveCoords()));
+    await save(photo.uri, 'camera');
   };
 
   const handlePickImage = async () => {
@@ -51,7 +53,7 @@ export default function GeoCamScreen() {
       quality: 0.7,
     });
     if (result.canceled) return;
-    addPhoto(buildPhoto(result.assets[0].uri, 'gallery', await resolveCoords()));
+    await save(result.assets[0].uri, 'gallery');
   };
 
   if (cam.permissionState === 'checking') {
@@ -71,10 +73,10 @@ export default function GeoCamScreen() {
   }
 
   const locationMissing = geo.permission !== 'granted' && geo.permission !== 'checking';
+  const errorMessage = cam.error ?? geo.error ?? saveError;
 
   return (
     <View style={styles.container}>
-      {/* CameraView sin hijos; solo montada con foco para liberar la cámara */}
       {isFocused && (
         <CameraView
           ref={cam.cameraRef}
@@ -84,7 +86,6 @@ export default function GeoCamScreen() {
         />
       )}
 
-      {/* Banner: pedir ubicación en contexto, sin bloquear la cámara */}
       {locationMissing && (
         <Pressable
           onPress={geo.permission === 'blocked' ? geo.openSettings : geo.requestPermission}
@@ -99,7 +100,6 @@ export default function GeoCamScreen() {
         </Pressable>
       )}
 
-      {/* Coordenadas en vivo */}
       {geo.coords && (
         <View style={styles.coordsBox}>
           <Text style={styles.coordsText}>
@@ -109,14 +109,12 @@ export default function GeoCamScreen() {
         </View>
       )}
 
-      {/* Errores como estado de UI */}
-      {(cam.error || geo.error) && (
+      {errorMessage && (
         <View style={styles.errorBox}>
-          <Text style={styles.errorText}>{cam.error ?? geo.error}</Text>
+          <Text style={styles.errorText}>{errorMessage}</Text>
         </View>
       )}
 
-      {/* Controles inferiores (hermanos absolutos de CameraView) */}
       <View style={styles.controls}>
         <Pressable onPress={handlePickImage} style={styles.sideButton} accessibilityLabel="Importar de galería">
           {lastPhoto ? (
