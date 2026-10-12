@@ -19,3 +19,26 @@
    ]
 6. Verificar que tsconfig.json tenga "paths": { "@/*": ["./*"] } (la plantilla ya lo trae).
 7. Ejecutar: npx expo start   (y abrir con Expo Go en el teléfono)
+
+
+# Semana 7 – cómo aplicar las etapas
+
+Cada carpeta (etapa-1, etapa-2, etapa-3) se copia ENCIMA de la raíz de tu proyecto (donde está package.json),
+respetando las rutas (src/...). Aplica las etapas EN ORDEN y prueba cada una antes de la siguiente.
+
+ETAPA 1  (T1–T5 + tabla albums)
+  1. Paso 1 de la guía (instalación + metro.config.js + babel.config.js).
+  2. Copiar etapa-1/ al proyecto. Borrar src/context/ (GeoPhotosContext ya no se usa).
+  3. npx drizzle-kit generate        -> crea drizzle/0000_*.sql y drizzle/migrations.js
+  4. npx expo start -c  y tomar 3 fotos (una sin ubicación). Cerrar Expo Go por completo y reabrir.
+
+ETAPA 2  (C2: segunda migración sobre datos reales)
+  1. Copiar etapa-2/src/db/schema.ts (agrega note y favorite).
+  2. npx drizzle-kit generate        -> drizzle/0001_*.sql
+  3. npx expo start -c  -> las 3 fotos de la etapa 1 deben seguir ahí.
+
+ETAPA 3  (C3, C4, C5)
+  1. Copiar etapa-3/ al proyecto (reemplaza _layout, usePhotos y repositorio; agrega pestaña Fotos y foto/[id]).
+  2. npx expo start -c
+
+Al final: README (pegar README-semana7-seccion.md) y AI-LOG (basado en AI-LOG-semana7-borrador.md).
