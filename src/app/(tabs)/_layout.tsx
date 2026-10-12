@@ -9,6 +9,10 @@ export default function TabsLayout() {
         options={{ title: 'GeoCam', tabBarIcon: () => <Text style={{ fontSize: 20 }}>📷</Text> }}
       />
       <Tabs.Screen
+        name="fotos"
+        options={{ title: 'Fotos', tabBarIcon: () => <Text style={{ fontSize: 20 }}>🗂️</Text> }}
+      />
+      <Tabs.Screen
         name="mapa"
         options={{ title: 'Mapa', tabBarIcon: () => <Text style={{ fontSize: 20 }}>🗺️</Text> }}
       />

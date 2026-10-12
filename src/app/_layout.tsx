@@ -15,10 +15,13 @@ export default function RootLayout() {
     );
   }
 
-  // Ninguna pantalla se monta antes de que la base esté migrada
   if (!success) {
     return <ActivityIndicator style={{ flex: 1 }} />;
   }
 
-  return <Stack screenOptions={{ headerShown: false }} />;
+  return (
+    <Stack screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="foto/[id]" options={{ headerShown: true, title: 'Foto' }} />
+    </Stack>
+  );
 }
